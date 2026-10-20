@@ -21,7 +21,8 @@
     "clean": "node scripts/build-installers.cjs clean",
     "lint": "tsc --noEmit",
     "test:barcodes": "tsx scripts/test-full-barcode-suite.ts",
-    "test": "tsx scripts/test-full-barcode-suite.ts"
+    "test:batch": "tsx scripts/test-batch-barcode-export.ts",
+    "test": "tsx scripts/test-full-barcode-suite.ts && tsx scripts/test-batch-barcode-export.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

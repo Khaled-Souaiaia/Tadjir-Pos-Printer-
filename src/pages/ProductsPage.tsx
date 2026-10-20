@@ -25,6 +25,7 @@ import { NeuButton } from '../components/common/NeuButton';
 import { NeuInput } from '../components/common/NeuInput';
 import { UNCATEGORIZED_CATEGORY } from '../db/sqlite-service';
 import { BarcodePrintModal } from '../components/products/BarcodePrintModal';
+import { ExportAllBarcodesModal } from '../components/products/ExportAllBarcodesModal';
 import { generateValidEan13, validateBarcode } from '../utils/barcodeUtils';
 import * as XLSX from 'xlsx';
 
@@ -80,6 +81,9 @@ export const ProductsPage: React.FC = () => {
 
   // حالة طباعة الباركود
   const [productToPrint, setProductToPrint] = useState<Product | null>(null);
+
+  // حالة نافذة تصدير جميع الباركودات PDF
+  const [isExportAllBarcodesOpen, setIsExportAllBarcodesOpen] = useState(false);
 
   // ملف استيراد CSV
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -597,6 +601,16 @@ export const ProductsPage: React.FC = () => {
             icon={<FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />}
           >
             <span>{t.exportExcel}</span>
+          </NeuButton>
+
+          <NeuButton
+            size="sm"
+            onClick={() => setIsExportAllBarcodesOpen(true)}
+            icon={<Barcode className="w-3.5 h-3.5 text-blue-600" />}
+            className="font-bold bg-blue-50/80 hover:bg-blue-100 text-blue-700 border border-blue-200"
+            title={lang === 'ar' ? 'تصدير جميع الباركودات PDF' : 'Exporter tous les codes-barres PDF'}
+          >
+            <span>{lang === 'ar' ? 'تصدير جميع الباركودات PDF' : 'Exporter tous les codes-barres PDF'}</span>
           </NeuButton>
 
           <NeuButton
@@ -1722,6 +1736,17 @@ export const ProductsPage: React.FC = () => {
           lang={lang}
           currency={t.currency}
           onProductUpdate={(updated) => setProductToPrint(updated)}
+        />
+      )}
+
+      {/* نافذة تصدير جميع الباركودات دفعة واحدة إلى ملف PDF */}
+      {isExportAllBarcodesOpen && (
+        <ExportAllBarcodesModal
+          isOpen={isExportAllBarcodesOpen}
+          onClose={() => setIsExportAllBarcodesOpen(false)}
+          products={products}
+          categories={categories}
+          initialCategoryFilter={selectedCategory}
         />
       )}
     </div>
