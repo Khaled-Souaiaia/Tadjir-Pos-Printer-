@@ -1,0 +1,58 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.tadjir.pos",
+  "productName": "TADJIR POS",
+  "copyright": "Copyright © 2026 TADJIR-DZ",
+  "directories": {
+    "app": ".build/apps/tadjir",
+    "output": "release/tadjir"
+  },
+  "asar": true,
+  "files": [
+    "package.json",
+    "dist-tadjir/**/*",
+    "electron/main-tadjir.cjs",
+    "electron/license-api.cjs",
+    "electron/preload.cjs",
+    "build-resources/icon-tadjir.ico",
+    "build-resources/icon-tadjir.png",
+    "!license-manager/**/*",
+    "!dist-license-manager/**/*",
+    "!dist/license-manager/**/*",
+    "!node_modules/**/*",
+    "!**/node_modules/**/*",
+    "!electron/main-license-manager.cjs",
+    "!scripts/**/*",
+    "!*.iss",
+    "!installers/**/*"
+  ],
+  "extraMetadata": {
+    "name": "tadjir-pos",
+    "productName": "TADJIR POS",
+    "author": "TADJIR-DZ",
+    "description": "TADJIR POS - نظام إدارة ومحاسبة نقاط البيع",
+    "main": "electron/main-tadjir.cjs"
+  },
+  "win": {
+    "target": "nsis",
+    "icon": "build-resources/icon-tadjir.ico",
+    "executableName": "TADJIR",
+    "requestedExecutionLevel": "asInvoker",
+    "signExecutable": false
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "allowElevation": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "TADJIR POS",
+    "artifactName": "TADJIR-Setup.exe",
+    "installerIcon": "build-resources/icon-tadjir.ico",
+    "uninstallerIcon": "build-resources/icon-tadjir.ico",
+    "deleteAppDataOnUninstall": false,
+    "runAfterFinish": true,
+    "packElevateHelper": false,
+    "uninstallDisplayName": "TADJIR POS - نظام إدارة ومحاسبة نقاط البيع"
+  }
+}

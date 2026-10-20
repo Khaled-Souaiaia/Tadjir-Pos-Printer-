@@ -1,0 +1,6 @@
+{
+  "name": "DzPOS Pro - نظام إدارة المحلات ونقاط البيع الجزائر",
+  "description": "برنامج احترافي متكامل لإدارة ومحاسبة المحلات التجارية ونقاط البيع في الجزائر بتصميم Soft Glass Neumorphism ودعم العمل دون إنترنت.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

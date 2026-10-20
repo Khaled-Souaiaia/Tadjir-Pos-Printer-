@@ -1,0 +1,175 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-base: #E8EDF5;
+    --neu-light: rgba(255, 255, 255, 0.85);
+    --neu-dark: rgba(163, 177, 198, 0.65);
+    --neu-shadow-dark: rgba(166, 180, 200, 0.7);
+    --neu-shadow-light: rgba(255, 255, 255, 0.95);
+  }
+
+  body {
+    font-family: 'Cairo', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-base);
+    background-image: 
+      radial-gradient(at 10% 20%, rgba(219, 234, 254, 0.45) 0px, transparent 50%),
+      radial-gradient(at 90% 10%, rgba(224, 231, 255, 0.4) 0px, transparent 50%),
+      radial-gradient(at 50% 85%, rgba(241, 245, 249, 0.6) 0px, transparent 60%);
+    background-attachment: fixed;
+  }
+
+  /* Monospace numbers for accounting / tabular currency */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* --- Soft Glass Neumorphism Classes --- */
+.neu-flat {
+  background: rgba(235, 240, 248, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 
+    8px 8px 18px rgba(166, 180, 200, 0.45),
+    -8px -8px 18px rgba(255, 255, 255, 0.85),
+    inset 0 1px 1px rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+}
+
+.neu-raised {
+  background: linear-gradient(135deg, rgba(245, 248, 253, 0.85), rgba(228, 234, 244, 0.75));
+  backdrop-filter: blur(14px);
+  box-shadow: 
+    6px 6px 14px rgba(166, 180, 200, 0.4),
+    -6px -6px 14px rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neu-raised:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    9px 9px 20px rgba(166, 180, 200, 0.5),
+    -9px -9px 20px rgba(255, 255, 255, 0.95);
+}
+
+.neu-raised:active, .neu-pressed {
+  transform: translateY(1px);
+  background: rgba(225, 232, 243, 0.8);
+  box-shadow: 
+    inset 4px 4px 8px rgba(166, 180, 200, 0.5),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.9);
+}
+
+.neu-button-primary {
+  background: linear-gradient(135deg, #2563EB, #1D4ED8);
+  color: #FFFFFF;
+  box-shadow: 
+    5px 5px 12px rgba(37, 99, 235, 0.35),
+    -3px -3px 8px rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neu-button-primary:hover {
+  background: linear-gradient(135deg, #1D4ED8, #1E40AF);
+  box-shadow: 
+    7px 7px 16px rgba(37, 99, 235, 0.45),
+    -3px -3px 10px rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.neu-button-primary:active {
+  box-shadow: 
+    inset 3px 3px 6px rgba(15, 23, 42, 0.4),
+    inset -2px -2px 6px rgba(255, 255, 255, 0.2);
+  transform: translateY(1px);
+}
+
+.neu-button-emerald {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #FFFFFF;
+  box-shadow: 
+    5px 5px 12px rgba(5, 150, 105, 0.35),
+    -3px -3px 8px rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.neu-button-emerald:hover {
+  background: linear-gradient(135deg, #047857, #065F46);
+  box-shadow: 
+    7px 7px 16px rgba(5, 150, 105, 0.45);
+  transform: translateY(-1px);
+}
+
+.neu-inset {
+  background: rgba(228, 234, 244, 0.6);
+  box-shadow: 
+    inset 4px 4px 8px rgba(166, 180, 200, 0.45),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.neu-input {
+  background: rgba(232, 238, 247, 0.65);
+  box-shadow: 
+    inset 3px 3px 6px rgba(166, 180, 200, 0.4),
+    inset -3px -3px 6px rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+}
+
+.neu-input:focus {
+  outline: none;
+  background: rgba(240, 245, 253, 0.85);
+  border-color: #3B82F6;
+  box-shadow: 
+    inset 3px 3px 6px rgba(59, 130, 246, 0.25),
+    inset -3px -3px 6px rgba(255, 255, 255, 0.9),
+    0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Custom Soft Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(228, 234, 244, 0.5);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(166, 180, 200, 0.7);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 155, 178, 0.9);
+}
+
+/* Print Styling for 80mm POS Thermal Receipt & A4 Invoices */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .thermal-receipt {
+    width: 80mm !important;
+    max-width: 80mm !important;
+    padding: 4mm !important;
+    margin: 0 auto !important;
+    font-family: 'Courier New', Courier, monospace, 'Cairo' !important;
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    color: #000000 !important;
+  }
+}

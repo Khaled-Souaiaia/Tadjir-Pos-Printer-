@@ -1,0 +1,56 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.tadjir.licencemanager",
+  "productName": "TADJIR LICENCE MANAGER",
+  "copyright": "Copyright © 2026 TADJIR-DZ",
+  "directories": {
+    "app": ".build/apps/license-manager",
+    "output": "release/license-manager"
+  },
+  "asar": true,
+  "files": [
+    "package.json",
+    "dist-license-manager/**/*",
+    "electron/main-license-manager.cjs",
+    "electron/license-api.cjs",
+    "electron/preload.cjs",
+    "build-resources/icon-license-manager.ico",
+    "build-resources/icon-license-manager.png",
+    "!dist-tadjir/**/*",
+    "!electron/main-tadjir.cjs",
+    "!node_modules/**/*",
+    "!**/node_modules/**/*",
+    "!scripts/**/*",
+    "!*.iss",
+    "!installers/**/*"
+  ],
+  "extraMetadata": {
+    "name": "tadjir-licence-manager",
+    "productName": "TADJIR LICENCE MANAGER",
+    "author": "TADJIR-DZ",
+    "description": "TADJIR LICENCE MANAGER - أداة إدارة التراخيص",
+    "main": "electron/main-license-manager.cjs"
+  },
+  "win": {
+    "target": "nsis",
+    "icon": "build-resources/icon-license-manager.ico",
+    "executableName": "TADJIR-Licence-Manager",
+    "requestedExecutionLevel": "asInvoker",
+    "signExecutable": false
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "allowElevation": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "TADJIR LICENCE MANAGER",
+    "artifactName": "TADJIR-Licence-Manager-Setup.exe",
+    "installerIcon": "build-resources/icon-license-manager.ico",
+    "uninstallerIcon": "build-resources/icon-license-manager.ico",
+    "deleteAppDataOnUninstall": false,
+    "runAfterFinish": true,
+    "packElevateHelper": false,
+    "uninstallDisplayName": "TADJIR LICENCE MANAGER - أداة إدارة التراخيص"
+  }
+}
