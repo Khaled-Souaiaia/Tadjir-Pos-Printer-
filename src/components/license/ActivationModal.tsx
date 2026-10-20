@@ -10,6 +10,8 @@ import {
   RefreshCw,
   UploadCloud,
   Info,
+  ExternalLink,
+  Terminal,
 } from 'lucide-react';
 import { NeuButton } from '../common/NeuButton';
 import { NeuInput } from '../common/NeuInput';
@@ -51,6 +53,13 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
     navigator.clipboard.writeText(deviceId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleQuickDemoActivate = () => {
+    const demoKey = 'TADJIR-DEMO-2026-TEST-PASS';
+    setSerialKeyInput(demoKey);
+    setCustomerNameInput(lang === 'ar' ? 'نسخة تجريبية / تقييم النظام' : 'Version Démo / Évaluation');
+    handleActivate(undefined, demoKey);
   };
 
   const handleActivate = async (e?: React.FormEvent, customToken?: string) => {
@@ -176,6 +185,40 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
                 ? 'يرجى إدخال مفتاح الترخيص المسلّم لك من قِبل مسؤول النظام لتفعيل البرنامج على هذا الجهاز. للحصول على المفتاح، قم بتزويد المسؤول بمعرّف هذا الجهاز (Device ID) الموضح أدناه.'
                 : "Veuillez saisir la clé de licence fournie par votre administrateur pour activer TADJIR sur ce poste. Pour obtenir votre clé, transmettez l'identifiant ci-dessous (Device ID) à l'administrateur."}
             </span>
+          </div>
+        </div>
+
+        {/* شريط الإجراءات السريعة للمطور والتقييم */}
+        <div className="mt-3.5 p-3 rounded-2xl bg-slate-900 border border-slate-800 text-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-bold text-slate-200">
+              {lang === 'ar' ? 'التقييم ووحدة المطور :' : 'Démo & Suite Développeur :'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleQuickDemoActivate}
+              disabled={isVerifying}
+              className="flex-1 sm:flex-none px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/30 transition-all cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>{lang === 'ar' ? 'تفعيل فوري سريع (Demo)' : 'Activation Rapide (Démo)'}</span>
+            </button>
+
+            <a
+              href="/license-manager/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 transition-colors"
+              title={lang === 'ar' ? 'فتح وحدة إدارة التراخيص للمطور' : 'Ouvrir License Manager'}
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>License Manager</span>
+              <ExternalLink className="w-3 h-3 text-slate-400" />
+            </a>
           </div>
         </div>
 

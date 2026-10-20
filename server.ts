@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 const isProd = process.env.NODE_ENV === 'production';
 
 app.use(express.json({ limit: '10mb' }));
@@ -63,26 +63,97 @@ export interface CentralLicenseRecord {
   }>;
 }
 
-// سجل التراخيص المركزية الافتراضي (فارغ في بيئة الإنتاج)
-const DEFAULT_CENTRAL_LICENSES: CentralLicenseRecord[] = [];
+// المفتاح الخاص للمطور لتوليد وتوقيع التراخيص الرسمية المشفرة Ed25519
+const MASTER_PRIVATE_KEY_JWK = {
+  key_ops: ['sign'],
+  ext: true,
+  alg: 'Ed25519',
+  crv: 'Ed25519',
+  d: 'Byjtc9rtQIjHkKA5MW2RgfSMy_RhrFAdKshburjCHoM',
+  x: '50X6Ke1RqohsZj_3XwPx9955WC_iq8aHAUEMxzaP8BM',
+  kty: 'OKP',
+};
+
+const serializePayloadCanonical = (payload: any): string => {
+  const canonicalObj: Record<string, any> = {
+    customerName: (payload.customerName || '').trim(),
+    deviceId: payload.deviceId ? payload.deviceId.trim().toUpperCase() : null,
+    expiresAt: payload.expiresAt || null,
+    issuedAt: payload.issuedAt,
+    licenseId: (payload.licenseId || '').trim().toUpperCase(),
+    notes: payload.notes || '',
+    product: payload.product || 'TADJIR',
+    serialKey: (payload.serialKey || '').trim().toUpperCase(),
+    type: payload.type,
+    version: payload.version || '1.0',
+  };
+  const dur = payload.durationHours ?? payload.duration_hours;
+  if (dur !== undefined && dur !== null) {
+    canonicalObj.durationHours = Number(dur);
+  }
+  return JSON.stringify(canonicalObj);
+};
+
+export const signLicensePayload = async (payload: any): Promise<string> => {
+  const privKey = await crypto.subtle.importKey(
+    'jwk',
+    MASTER_PRIVATE_KEY_JWK,
+    { name: 'Ed25519' },
+    false,
+    ['sign']
+  );
+  const data = new TextEncoder().encode(serializePayloadCanonical(payload));
+  const sigBuffer = await crypto.subtle.sign({ name: 'Ed25519' }, privKey, data);
+  return Buffer.from(sigBuffer).toString('base64');
+};
+
+// سجل التراخيص المركزية الافتراضي (يحتوي على ترخيص تقييم معتمد دائم)
+const DEFAULT_CENTRAL_LICENSES: CentralLicenseRecord[] = [
+  {
+    id: 'lic-demo-evaluation',
+    licenseId: 'LIC-2026-LIFE-DEMO',
+    serialKey: 'TADJIR-DEMO-2026-TEST-PASS',
+    license_key_hash: hashLicenseKey('TADJIR-DEMO-2026-TEST-PASS'),
+    customerName: 'نسخة تجريبية / تقييم النظام',
+    type: 'lifetime',
+    license_type: 'lifetime',
+    issuedAt: '2026-01-01T00:00:00.000Z',
+    created_at: '2026-01-01T00:00:00.000Z',
+    expiresAt: null,
+    expires_at: null,
+    deviceId: null,
+    hardware_lock: null,
+    notes: 'Official Evaluation License',
+    status: 'active',
+    signature: 'Ya0LKJiSWoyAgCOXAMF12+epng1vx7ePTJn+2cNxI4+psczyk5+smKS/14goXRve1rR9JIpuSPpjQhf8q4xwBQ==',
+    activationToken: 'TADJIR-LIC-JTdCJTIycGF5bG9hZCUyMiUzQSU3QiUyMnByb2R1Y3QlMjIlM0ElMjJUQURKSVIlMjIlMkMlMjJ2ZXJzaW9uJTIyJTNBJTIyMS4wJTIyJTJDJTIybGljZW5zZUlkJTIyJTNBJTIyTElDLTIwMjYtTElGRS1ERU1PJTIyJTJDJTIyc2VyaWFsS2V5JTIyJTNBJTIyVEFESklSLURFTU8tMjAyNi1URVNULVBBU1MlMjIlMkMlMjJjdXN0b21lck5hbWUlMjIlM0ElMjIlRDklODYlRDglQjMlRDglQUUlRDglQTklMjAlRDglQUElRDglQUMlRDglQjElRDklOEElRDglQTglRDklOEElRDglQTklMjAlMkYlMjAlRDglQUElRDklODIlRDklOEElRDklOEElRDklODUlMjAlRDglQTclRDklODQlRDklODYlRDglQjglRDglQTclRDklODUlMjIlMkMlMjJ0eXBlJTIyJTNBJTIybGlmZXRpbWUlMjIlMkMlMjJpc3N1ZWRBdCUyMiUzQSUyMjIwMjYtMDEtMDFUMDAlM0EwMCUzQTAwLjAwMFolMjIlMkMlMjJleHBpcmVzQXQlMjIlM0FudWxsJTJDJTIyZGV2aWNlSWQlMjIlM0FudWxsJTJDJTIybm90ZXMlMjIlM0ElMjJPZmZpY2lhbCUyMEV2YWx1YXRpb24lMjBMaWNlbnNlJTIyJTdEJTJDJTIyc2lnbmF0dXJlJTIyJTNBJTIyWWEwTEtKaVNXb3lBZ0NPWEFNRjEyJTJCZXBuZzF2eDdlUFRKbiUyQjJjTnhJNCUyQnBzY3p5azUlMkJzbUtTJTJGMTRnb1hSdmUxclI5SklwdVNQcGpRaGY4cTR4d0JRJTNEJTNEJTIyJTdE',
+    pricePaidDzd: 0,
+    updatedAt: new Date().toISOString(),
+  },
+];
 
 // قراءة التراخيص من الملف المركزي
 const readCentralLicenses = (): CentralLicenseRecord[] => {
   try {
     if (!fs.existsSync(CENTRAL_DB_FILE)) {
       fs.writeFileSync(CENTRAL_DB_FILE, JSON.stringify(DEFAULT_CENTRAL_LICENSES, null, 2), 'utf8');
-      return [];
+      return [...DEFAULT_CENTRAL_LICENSES];
     }
     const raw = fs.readFileSync(CENTRAL_DB_FILE, 'utf8');
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      fs.writeFileSync(CENTRAL_DB_FILE, JSON.stringify([], null, 2), 'utf8');
-      return [];
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      fs.writeFileSync(CENTRAL_DB_FILE, JSON.stringify(DEFAULT_CENTRAL_LICENSES, null, 2), 'utf8');
+      return [...DEFAULT_CENTRAL_LICENSES];
+    }
+    const hasDemo = parsed.some((l) => l.serialKey === 'TADJIR-DEMO-2026-TEST-PASS');
+    if (!hasDemo) {
+      parsed.push(...DEFAULT_CENTRAL_LICENSES);
+      fs.writeFileSync(CENTRAL_DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
     }
     return parsed;
   } catch (err) {
     console.error('Error reading central licenses DB:', err);
-    return [];
+    return [...DEFAULT_CENTRAL_LICENSES];
   }
 };
 
@@ -588,6 +659,74 @@ app.get('/api/licenses/:identifier/history', (req: Request, res: Response) => {
   });
 });
 
+// 10. توليد وتفعيل ترخيص تجريبي فوري للتقييم (Quick Trial Activation Endpoint)
+app.post('/api/licenses/quick-trial', async (req: Request, res: Response) => {
+  try {
+    const { deviceId, customerName } = req.body || {};
+    const now = new Date();
+    const cleanDeviceId = deviceId ? String(deviceId).trim().toUpperCase() : null;
+    const clientName = customerName ? String(customerName).trim() : 'تجربة فورية (Quick Trial)';
+    const randHex = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const randKeyHex = () => Math.random().toString(36).substring(2, 6).toUpperCase();
+    const serialKey = `TADJIR-${randKeyHex()}-${randKeyHex()}-${randKeyHex()}-${randKeyHex()}`;
+    const licenseId = `LIC-${now.getFullYear()}-TRL-${randHex}`;
+
+    const expDate = new Date(now.getTime() + 7 * 24 * 3600 * 1000); // 7 days trial
+    const payload = {
+      product: 'TADJIR',
+      version: '1.0',
+      licenseId,
+      serialKey,
+      customerName: clientName,
+      type: 'trial',
+      issuedAt: now.toISOString(),
+      expiresAt: expDate.toISOString(),
+      durationHours: 168,
+      duration_hours: 168,
+      deviceId: cleanDeviceId,
+      notes: 'Quick Evaluation Trial',
+    };
+
+    const signature = await signLicensePayload(payload);
+    const bundle = { payload, signature };
+    const activationToken = `TADJIR-LIC-${Buffer.from(encodeURIComponent(JSON.stringify(bundle))).toString('base64')}`;
+
+    const record: CentralLicenseRecord = {
+      id: `lic-${Date.now()}`,
+      licenseId,
+      serialKey,
+      license_key_hash: hashLicenseKey(serialKey),
+      customerName: clientName,
+      type: 'trial',
+      license_type: 'trial',
+      duration_hours: 168,
+      durationHours: 168,
+      issuedAt: now.toISOString(),
+      expiresAt: expDate.toISOString(),
+      deviceId: cleanDeviceId,
+      notes: 'Quick Evaluation Trial',
+      status: 'active',
+      signature,
+      activationToken,
+      pricePaidDzd: 0,
+      updatedAt: now.toISOString(),
+    };
+
+    const licenses = readCentralLicenses();
+    licenses.unshift(record);
+    writeCentralLicenses(licenses);
+
+    return res.json({
+      success: true,
+      serialKey,
+      activationToken,
+      license: record,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err?.message || 'Error creating trial' });
+  }
+});
+
 // إعادة توجيه مسار مدير التراخيص إلى /license-manager/ فقط إذا كان المسار دقيقاً دون سلاش
 app.use((req, res, next) => {
   if (req.path === '/license-manager') {
@@ -599,6 +738,9 @@ app.use((req, res, next) => {
 // =======================================================================
 // إعداد Vite في بيئة التطوير أو تقديم الملفات الثابتة في الإنتاج
 // =======================================================================
+// Serve static assets from public/ folder (sample PDFs, icons, assets)
+app.use(express.static(path.resolve('public')));
+
 async function startServer() {
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');

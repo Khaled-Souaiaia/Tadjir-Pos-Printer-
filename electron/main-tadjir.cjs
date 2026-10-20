@@ -157,8 +157,62 @@ function initDesktopDatabase() {
   }
 }
 
-// IPC Handlers for POS hardware (Receipt printer, cash drawer, database)
+// IPC Handlers for POS hardware (Receipt printer, cash drawer, database, barcode labels)
 ipcMain.handle('app:version', () => app.getVersion());
+
+ipcMain.handle('pos:get-printers', async () => {
+  if (!mainWindow) return [];
+  try {
+    const list = await mainWindow.webContents.getPrintersAsync();
+    return list.map((p) => ({
+      name: p.name,
+      displayName: p.displayName || p.name,
+      description: p.description || '',
+      status: p.status,
+      isDefault: p.isDefault,
+      isVirtual: /pdf|xps|onenote|fax/i.test(p.name),
+    }));
+  } catch (err) {
+    console.warn('[POS Printers] Could not enumerate printers:', err.message);
+    return [];
+  }
+});
+
+ipcMain.handle('pos:print-barcode-label', async (event, options) => {
+  if (!mainWindow) return { success: false, error: 'Main window unavailable' };
+  const { htmlContent, printerName, silent } = options || {};
+  if (!htmlContent) return { success: false, error: 'Empty print content' };
+
+  try {
+    const printWin = new BrowserWindow({
+      show: false,
+      webPreferences: { nodeIntegration: true, contextIsolation: false },
+    });
+    await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURI(htmlContent)}`);
+
+    return new Promise((resolve) => {
+      printWin.webContents.print(
+        {
+          silent: silent ?? true,
+          printBackground: true,
+          deviceName: printerName || '',
+          margins: { marginType: 'none' },
+        },
+        (success, failureReason) => {
+          printWin.close();
+          if (success) {
+            resolve({ success: true, printerName: printerName || 'Default Printer' });
+          } else {
+            resolve({ success: false, error: failureReason || 'Printing failed or was cancelled' });
+          }
+        }
+      );
+    });
+  } catch (err) {
+    console.error('[POS Label Print Error]:', err);
+    return { success: false, error: err.message || 'Printer error' };
+  }
+});
 
 ipcMain.handle('pos:print-receipt', async (event, contentHtml) => {
   if (!mainWindow) return false;

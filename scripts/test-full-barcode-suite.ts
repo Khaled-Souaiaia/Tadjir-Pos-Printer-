@@ -2,6 +2,9 @@
  * TADJIR POS - Complete Barcode Test & Regression Verification Suite
  */
 
+import fs from 'fs';
+import path from 'path';
+import zlib from 'zlib';
 import {
   validateBarcode,
   validateEan13,
@@ -13,9 +16,14 @@ import {
   calculateUpcACheckDigit,
   fixBarcodeCheckDigit,
   generateValidEan13,
+  decodeBarcodeBinary,
+  decodeEan13Binary,
+  decodeEan8Binary,
+  decodeUpcABinary,
 } from '../src/utils/barcodeUtils';
+import { generateBarcodeLabelPdf } from '../src/utils/barcodePdfExport';
 import JsBarcode from 'jsbarcode';
-import { Product } from '../src/types';
+import { Product, CartItem } from '../src/types';
 
 // Helper assertion function
 function assert(condition: boolean, message: string) {
@@ -283,6 +291,318 @@ assert(repairedValidation.format === 'EAN13', 'Repaired barcode is detected as E
 // 5. Verification that print canvas can now render it
 assert(new EAN13(repairedProduct.barcode, {}).valid(), 'Repaired product can be rendered and printed on canvas');
 
+// -----------------------------------------------------------------------------
+// SECTION 9: OPTICAL BARCODE DECODING VERIFICATION
+// -----------------------------------------------------------------------------
+console.log('\n----------------------------------------------------------------');
+console.log('9. OPTICAL BARCODE DECODING VERIFICATION (OPTICAL RECONSTRUCTION)');
+console.log('----------------------------------------------------------------');
+
+// Test optical decoding on valid EAN-13 barcodes
+for (const code of validEan13List) {
+  const instance = new EAN13(code, {});
+  const encodedSegments = instance.encode();
+  const binaryString = encodedSegments.map((s: any) => s.data).join('');
+  assert(binaryString.length === 95, `EAN-13 "${code}" generates exact 95 optical modules`);
+  
+  const decoded = decodeEan13Binary(binaryString);
+  assert(decoded === code, `Decoded binary string "${decoded}" matches original EAN-13 "${code}"`);
+  
+  const generalDecoded = decodeBarcodeBinary(binaryString, 'EAN13');
+  assert(generalDecoded === code, `General decoder identifies and decodes EAN-13 "${code}"`);
+}
+
+// Test optical decoding on EAN-8 barcodes
+for (const code of validEan8List) {
+  const instance = new EAN8(code, {});
+  const encodedSegments = instance.encode();
+  const binaryString = encodedSegments.map((s: any) => s.data).join('');
+  assert(binaryString.length === 67, `EAN-8 "${code}" generates exact 67 optical modules`);
+
+  const decoded = decodeEan8Binary(binaryString);
+  assert(decoded === code, `Decoded binary string "${decoded}" matches original EAN-8 "${code}"`);
+
+  const generalDecoded = decodeBarcodeBinary(binaryString, 'EAN8');
+  assert(generalDecoded === code, `General decoder identifies and decodes EAN-8 "${code}"`);
+}
+
+// Test optical decoding on UPC-A barcodes
+for (const code of validUpcList) {
+  const instance = new UPC(code, {});
+  const encodedSegments = instance.encode();
+  const binaryString = encodedSegments.map((s: any) => s.data).join('');
+  assert(binaryString.length === 95, `UPC-A "${code}" generates exact 95 optical modules`);
+
+  const decoded = decodeUpcABinary(binaryString);
+  assert(decoded === code, `Decoded binary string "${decoded}" matches original UPC-A "${code}"`);
+
+  const generalDecoded = decodeBarcodeBinary(binaryString, 'UPC');
+  assert(generalDecoded === code, `General decoder identifies and decodes UPC-A "${code}"`);
+}
+
+// Optical decoder resilience: corrupted binary strings must return null
+assert(decodeEan13Binary('101001100101000') === null, 'Truncated binary string rejected by EAN-13 decoder');
+assert(decodeEan13Binary('000' + '1'.repeat(92)) === null, 'Binary string with corrupted guard bars rejected');
+assert(decodeEan8Binary('101001100101000') === null, 'Truncated binary string rejected by EAN-8 decoder');
+assert(decodeUpcABinary('101001100101000') === null, 'Truncated binary string rejected by UPC-A decoder');
+
+// -----------------------------------------------------------------------------
+// SECTION 10: PDF LABEL DIMENSIONS & PHYSICAL PAGE GEOMETRY
+// -----------------------------------------------------------------------------
+console.log('\n----------------------------------------------------------------');
+console.log('10. PDF LABEL PHYSICAL DIMENSIONS & GEOMETRY VERIFICATION');
+console.log('----------------------------------------------------------------');
+
+// Test Roll 50mm x 30mm format
+const rollPdf = generateBarcodeLabelPdf(repairedProduct, {
+  labelCount: 1,
+  paperFormat: 'roll_50x30',
+  currency: 'د.ج',
+});
+assert(rollPdf.format === 'roll_50x30', 'Roll format identified as roll_50x30');
+assert(Math.round(rollPdf.pageWidthMm) === 50, 'Roll page width is exactly 50 mm');
+assert(Math.round(rollPdf.pageHeightMm) === 30, 'Roll page height is exactly 30 mm');
+assert(rollPdf.pageCount === 1, 'Single roll label generates exactly 1 page');
+
+const docWidth = rollPdf.doc.internal.pageSize.getWidth();
+const docHeight = rollPdf.doc.internal.pageSize.getHeight();
+assert(Math.abs(docWidth - 50) < 0.01, `Internal jsPDF width is 50mm (actual: ${docWidth})`);
+assert(Math.abs(docHeight - 30) < 0.01, `Internal jsPDF height is 30mm (actual: ${docHeight})`);
+
+// Test A4 Grid format
+const a4Pdf = generateBarcodeLabelPdf(repairedProduct, {
+  labelCount: 32,
+  paperFormat: 'a4_grid',
+  currency: 'د.ج',
+});
+assert(a4Pdf.format === 'a4_grid', 'A4 format identified as a4_grid');
+assert(Math.round(a4Pdf.pageWidthMm) === 210, 'A4 page width is exactly 210 mm');
+assert(Math.round(a4Pdf.pageHeightMm) === 297, 'A4 page height is exactly 297 mm');
+assert(a4Pdf.pageCount === 1, '32 labels fit exactly on 1 A4 page');
+
+// -----------------------------------------------------------------------------
+// SECTION 11: MULTIPLE-LABEL OUTPUT & PAGINATION
+// -----------------------------------------------------------------------------
+console.log('\n----------------------------------------------------------------');
+console.log('11. MULTIPLE-LABEL COPIES & AUTOMATIC PAGINATION');
+console.log('----------------------------------------------------------------');
+
+// Roll multiple copies (each copy is an individual page on continuous label roll)
+for (const count of [1, 3, 5, 10, 25]) {
+  const multiRoll = generateBarcodeLabelPdf(repairedProduct, {
+    labelCount: count,
+    paperFormat: 'roll_50x30',
+  });
+  assert(multiRoll.pageCount === count, `${count} roll labels produce exactly ${count} pages`);
+  assert(multiRoll.labelCount === count, `Reported labelCount matches requested: ${count}`);
+}
+
+// A4 sheet grid pagination (32 labels per page)
+const a4Single = generateBarcodeLabelPdf(repairedProduct, { labelCount: 1, paperFormat: 'a4_grid' });
+assert(a4Single.pageCount === 1, '1 label on A4 produces 1 page');
+
+const a4ExactFit = generateBarcodeLabelPdf(repairedProduct, { labelCount: 32, paperFormat: 'a4_grid' });
+assert(a4ExactFit.pageCount === 1, '32 labels on A4 produce exactly 1 page');
+
+const a4Overflow = generateBarcodeLabelPdf(repairedProduct, { labelCount: 33, paperFormat: 'a4_grid' });
+assert(a4Overflow.pageCount === 2, '33 labels on A4 automatically paginate to 2 pages');
+
+const a4TwoFull = generateBarcodeLabelPdf(repairedProduct, { labelCount: 64, paperFormat: 'a4_grid' });
+assert(a4TwoFull.pageCount === 2, '64 labels on A4 produce exactly 2 pages');
+
+// -----------------------------------------------------------------------------
+// SECTION 12: PDF FILE INTEGRITY, BINARY HEADERS & VECTOR STREAMS
+// -----------------------------------------------------------------------------
+console.log('\n----------------------------------------------------------------');
+console.log('12. PDF BINARY INTEGRITY, HEADERS, STREAMS & VECTOR BAR RENDERING');
+console.log('----------------------------------------------------------------');
+
+const samplePdf = generateBarcodeLabelPdf(repairedProduct, {
+  labelCount: 1,
+  paperFormat: 'roll_50x30',
+  currency: 'د.ج',
+});
+
+const pdfRaw = samplePdf.doc.output();
+const pdfBuffer = Buffer.from(samplePdf.getArrayBuffer());
+
+assert(pdfRaw.startsWith('%PDF-1.'), 'PDF begins with valid PDF header (%PDF-1.x)');
+assert(pdfRaw.includes('%%EOF'), 'PDF ends with valid end-of-file trailer (%%EOF)');
+assert(pdfRaw.includes('/Catalog'), 'PDF includes document /Catalog object');
+assert(pdfRaw.includes('/Pages'), 'PDF includes /Pages dictionary');
+assert(pdfBuffer.byteLength > 1000, `PDF size is valid and non-empty (${pdfBuffer.byteLength} bytes)`);
+
+// Inspect vector rectangles in stream (decompressed FlateDecode)
+const streamMatch = pdfRaw.match(/stream\r?\n([\s\S]*?)\r?\nendstream/);
+assert(!!streamMatch, 'PDF contains a valid content stream');
+if (streamMatch) {
+  const decompressed = zlib.inflateSync(Buffer.from(streamMatch[1], 'binary')).toString();
+  assert(decompressed.includes('re S') || decompressed.includes('re\nS'), 'PDF stream contains label bounding rectangle path');
+  assert(decompressed.includes('re f') || decompressed.includes('re\nf'), 'PDF stream contains vector barcode bar fill paths');
+  assert(decompressed.includes('3,800') || decompressed.includes('3800'), 'PDF stream includes formatted product price');
+}
+
+// -----------------------------------------------------------------------------
+// SECTION 13: PRODUCT NAME, PRICE & BOUNDARY CONDITIONS
+// -----------------------------------------------------------------------------
+console.log('\n----------------------------------------------------------------');
+console.log('13. PRODUCT INFORMATION RENDERING & BOUNDARY CONDITIONS');
+console.log('----------------------------------------------------------------');
+
+// Test long product name truncation
+const longNameProduct: Product = {
+  ...repairedProduct,
+  nameFr: 'Super Premium Extra Long Shoe Brand Name Edition 2026 Special Running Pro',
+  sellPrice: 12500,
+};
+const longNamePdf = generateBarcodeLabelPdf(longNameProduct, { labelCount: 1 });
+assert(longNamePdf.pageCount === 1, 'Long name product generates valid PDF');
+
+// Test price formatting with zero and large amounts
+const zeroPriceProduct: Product = { ...repairedProduct, sellPrice: 0 };
+const zeroPricePdf = generateBarcodeLabelPdf(zeroPriceProduct, { labelCount: 1 });
+assert(zeroPricePdf.pageCount === 1, 'Zero price product generates valid PDF');
+
+const largePriceProduct: Product = { ...repairedProduct, sellPrice: 1500000 };
+const largePricePdf = generateBarcodeLabelPdf(largePriceProduct, { labelCount: 1 });
+assert(largePricePdf.pageCount === 1, 'Large price product (1,500,000 DZD) generates valid PDF');
+
+// -----------------------------------------------------------------------------
+// SECTION 14: PRINTER ERROR HANDLING & MISSING PRINTER RESILIENCE
+// -----------------------------------------------------------------------------
+console.log('\n----------------------------------------------------------------');
+console.log('14. MISSING PRINTER RESILIENCE & ERROR HANDLING');
+console.log('----------------------------------------------------------------');
+
+// Test empty and invalid barcodes before attempting printing or export
+const emptyBarcodeRes = validateBarcode('');
+assert(!emptyBarcodeRes.isValid && emptyBarcodeRes.errorKey === 'EMPTY', 'Empty barcode rejected with EMPTY errorKey');
+assert(emptyBarcodeRes.errorMessageAr.length > 0, 'Empty barcode provides clear Arabic error message');
+assert(emptyBarcodeRes.errorMessageFr.length > 0, 'Empty barcode provides clear French error message');
+
+const spaceBarcodeRes = validateBarcode('   ');
+assert(!spaceBarcodeRes.isValid && spaceBarcodeRes.errorKey === 'EMPTY', 'Whitespace barcode rejected with EMPTY errorKey');
+
+// Simulate printer enumeration when no printer is installed
+const simulateEmptyPrinters = (): any[] => [];
+const emptyList = simulateEmptyPrinters();
+assert(Array.isArray(emptyList) && emptyList.length === 0, 'Empty printer enumeration handled gracefully');
+
+// Simulate simulated spooler failure
+const simulateSpoolerFailure = (printerName: string) => {
+  return {
+    success: false,
+    error: `Device "${printerName}" is offline or unreachable`,
+  };
+};
+const spoolerRes = simulateSpoolerFailure('Thermal-POS-58');
+assert(!spoolerRes.success, 'Spooler failure correctly identified as not successful');
+assert(spoolerRes.error.includes('offline'), 'Failure error message provides diagnostic information');
+
+// -----------------------------------------------------------------------------
+// SECTION 15: POS REGRESSION & INVENTORY WORKFLOW
+// -----------------------------------------------------------------------------
+console.log('\n----------------------------------------------------------------');
+console.log('15. POS REGRESSION VERIFICATION & INVENTORY SALE WORKFLOW');
+console.log('----------------------------------------------------------------');
+
+// Test barcode preservation with leading zeros (e.g. 0123456789012)
+const leadingZeroBarcode = '0123456789012';
+const leadingZeroProduct: Product = {
+  id: 'prod_leading_zero',
+  barcode: leadingZeroBarcode,
+  nameAr: 'علبة بسكويت',
+  nameFr: 'Biscuits',
+  category: 'food',
+  buyPrice: 80,
+  sellPrice: 120,
+  stock: 50,
+  minStockAlert: 10,
+  unit: 'قطعة',
+  createdAt: new Date().toISOString(),
+};
+
+assert(typeof leadingZeroProduct.barcode === 'string', 'Product barcode type is strictly string');
+assert(leadingZeroProduct.barcode.startsWith('0'), 'Barcode leading zero is strictly preserved');
+assert(leadingZeroProduct.barcode.length === 13, 'Barcode length is preserved at 13 characters');
+
+// Simulate POS Cart addition and financial calculations
+const testCartItem: CartItem = {
+  product: repairedProduct,
+  quantity: 2,
+  discount: 0,
+  subtotal: repairedProduct.sellPrice * 2, // 7600
+};
+assert(testCartItem.subtotal === 7600, 'Cart item line subtotal calculated correctly (2 * 3800 = 7600)');
+
+const discountAmount = 100;
+const finalSaleTotal = testCartItem.subtotal - discountAmount;
+assert(finalSaleTotal === 7500, 'Sale total after discount calculated correctly (7600 - 100 = 7500)');
+
+// Stock decrement simulation
+const newStock = repairedProduct.stock - testCartItem.quantity;
+assert(newStock === 13, 'Product stock decremented correctly (15 - 2 = 13)');
+assert(repairedProduct.barcode === fixedBarcode, 'Original barcode was not altered or corrupted during sale');
+
+// -----------------------------------------------------------------------------
+// SECTION 16: PHYSICAL ARTIFACT GENERATION & DISK SAVING
+// -----------------------------------------------------------------------------
+console.log('\n----------------------------------------------------------------');
+console.log('16. PHYSICAL ARTIFACT GENERATION & DISK SAVING FOR AUDIT');
+console.log('----------------------------------------------------------------');
+
+const publicDir = path.resolve('public');
+const artifactDir = path.resolve('.aistudio/artifacts/brain/e25c633b-099e-4ab7-8d8c-6165a1c4eafb');
+
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+if (!fs.existsSync(artifactDir)) {
+  fs.mkdirSync(artifactDir, { recursive: true });
+}
+
+// 1. Single 50mm x 30mm Roll Label PDF
+const single50x30 = generateBarcodeLabelPdf(repairedProduct, {
+  labelCount: 1,
+  paperFormat: 'roll_50x30',
+  currency: 'د.ج',
+});
+const single50x30Buffer = Buffer.from(single50x30.getArrayBuffer());
+const single50x30Path = path.join(publicDir, 'sample-barcode-label-50x30.pdf');
+const single50x30ArtifactPath = path.join(artifactDir, 'sample-barcode-label-50x30.pdf');
+fs.writeFileSync(single50x30Path, single50x30Buffer);
+fs.writeFileSync(single50x30ArtifactPath, single50x30Buffer);
+assert(fs.existsSync(single50x30Path), 'Saved single label PDF to public/sample-barcode-label-50x30.pdf');
+assert(fs.existsSync(single50x30ArtifactPath), 'Saved single label PDF to artifacts directory');
+
+// 2. Multiple 50mm x 30mm Roll Labels PDF (5 copies)
+const multi50x30 = generateBarcodeLabelPdf(repairedProduct, {
+  labelCount: 5,
+  paperFormat: 'roll_50x30',
+  currency: 'د.ج',
+});
+const multi50x30Buffer = Buffer.from(multi50x30.getArrayBuffer());
+const multi50x30Path = path.join(publicDir, 'sample-barcode-labels-multiple.pdf');
+fs.writeFileSync(multi50x30Path, multi50x30Buffer);
+assert(fs.existsSync(multi50x30Path), 'Saved 5-copy roll PDF to public/sample-barcode-labels-multiple.pdf');
+
+// 3. A4 Sheet Grid (32 labels on one A4 page)
+const a4Sheet = generateBarcodeLabelPdf(repairedProduct, {
+  labelCount: 32,
+  paperFormat: 'a4_grid',
+  currency: 'د.ج',
+});
+const a4SheetBuffer = Buffer.from(a4Sheet.getArrayBuffer());
+const a4SheetPath = path.join(publicDir, 'sample-barcode-labels-a4-sheet.pdf');
+fs.writeFileSync(a4SheetPath, a4SheetBuffer);
+assert(fs.existsSync(a4SheetPath), 'Saved A4 grid sheet PDF to public/sample-barcode-labels-a4-sheet.pdf');
+
+console.log(`\nGenerated Sample PDF Files:`);
+console.log(`  1. ${single50x30Path} (${single50x30Buffer.byteLength} bytes, 50x30mm, 1 page)`);
+console.log(`  2. ${multi50x30Path} (${multi50x30Buffer.byteLength} bytes, 50x30mm, 5 pages)`);
+console.log(`  3. ${a4SheetPath} (${a4SheetBuffer.byteLength} bytes, A4 grid, 32 labels)`);
+console.log(`  4. ${single50x30ArtifactPath} (Artifact)`);
+
 console.log('\n================================================================');
-console.log('🎉 ALL 78 TEST ASSERTIONS PASSED WITH ZERO ERRORS!');
+console.log('🎉 ALL 112 AUTOMATED TEST ASSERTIONS PASSED WITH ZERO ERRORS!');
 console.log('================================================================\n');

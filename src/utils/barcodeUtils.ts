@@ -410,3 +410,162 @@ export function fixBarcodeCheckDigit(barcode: string): string | null {
   }
   return null;
 }
+
+// -----------------------------------------------------------------------------
+// GS1 Binary Barcode Decoders (Optical Scanner Simulation)
+// -----------------------------------------------------------------------------
+
+const GS1_L_CODES: Record<string, number> = {
+  '0001101': 0, '0011001': 1, '0010011': 2, '0111101': 3, '0100011': 4,
+  '0110001': 5, '0101111': 6, '0111011': 7, '0110111': 8, '0001011': 9,
+};
+
+const GS1_G_CODES: Record<string, number> = {
+  '0100111': 0, '0110011': 1, '0011011': 2, '0100001': 3, '0011101': 4,
+  '0111001': 5, '0000101': 6, '0010001': 7, '0001001': 8, '0010111': 9,
+};
+
+const GS1_R_CODES: Record<string, number> = {
+  '1110010': 0, '1100110': 1, '1101100': 2, '1000010': 3, '1011100': 4,
+  '1001110': 5, '1010000': 6, '1000100': 7, '1001000': 8, '1110100': 9,
+};
+
+const GS1_PARITY_PATTERNS: Record<string, number> = {
+  'AAAAAA': 0, 'AABABB': 1, 'AABBAB': 2, 'AABBBA': 3, 'ABAABB': 4,
+  'ABBAAB': 5, 'ABBBAA': 6, 'ABABAB': 7, 'ABABBA': 8, 'ABBABA': 9,
+};
+
+/**
+ * Decodes a 95-bit binary string into an EAN-13 barcode.
+ * Returns the decoded 13-digit string or null if invalid or corrupted.
+ */
+export function decodeEan13Binary(binaryBars: string): string | null {
+  const clean = binaryBars.replace(/\s+/g, '');
+  if (clean.length !== 95) return null;
+
+  // Verify guard bars: 101 at start, 01010 at middle, 101 at end
+  if (clean.slice(0, 3) !== '101' || clean.slice(45, 50) !== '01010' || clean.slice(92, 95) !== '101') {
+    return null;
+  }
+
+  let parity = '';
+  const leftDigits: number[] = [];
+
+  for (let i = 0; i < 6; i++) {
+    const chunk = clean.slice(3 + i * 7, 3 + (i + 1) * 7);
+    if (GS1_L_CODES[chunk] !== undefined) {
+      parity += 'A';
+      leftDigits.push(GS1_L_CODES[chunk]);
+    } else if (GS1_G_CODES[chunk] !== undefined) {
+      parity += 'B';
+      leftDigits.push(GS1_G_CODES[chunk]);
+    } else {
+      return null;
+    }
+  }
+
+  const firstDigit = GS1_PARITY_PATTERNS[parity];
+  if (firstDigit === undefined) return null;
+
+  const rightDigits: number[] = [];
+  for (let i = 0; i < 6; i++) {
+    const chunk = clean.slice(50 + i * 7, 50 + (i + 1) * 7);
+    if (GS1_R_CODES[chunk] !== undefined) {
+      rightDigits.push(GS1_R_CODES[chunk]);
+    } else {
+      return null;
+    }
+  }
+
+  return [firstDigit, ...leftDigits, ...rightDigits].join('');
+}
+
+/**
+ * Decodes a 67-bit binary string into an EAN-8 barcode.
+ */
+export function decodeEan8Binary(binaryBars: string): string | null {
+  const clean = binaryBars.replace(/\s+/g, '');
+  if (clean.length !== 67) return null;
+
+  // 101 at start, 01010 in middle, 101 at end
+  if (clean.slice(0, 3) !== '101' || clean.slice(31, 36) !== '01010' || clean.slice(64, 67) !== '101') {
+    return null;
+  }
+
+  const leftDigits: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const chunk = clean.slice(3 + i * 7, 3 + (i + 1) * 7);
+    if (GS1_L_CODES[chunk] !== undefined) {
+      leftDigits.push(GS1_L_CODES[chunk]);
+    } else {
+      return null;
+    }
+  }
+
+  const rightDigits: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const chunk = clean.slice(36 + i * 7, 36 + (i + 1) * 7);
+    if (GS1_R_CODES[chunk] !== undefined) {
+      rightDigits.push(GS1_R_CODES[chunk]);
+    } else {
+      return null;
+    }
+  }
+
+  return [...leftDigits, ...rightDigits].join('');
+}
+
+/**
+ * Decodes a 95-bit binary string into a UPC-A barcode.
+ */
+export function decodeUpcABinary(binaryBars: string): string | null {
+  const clean = binaryBars.replace(/\s+/g, '');
+  if (clean.length !== 95) return null;
+
+  if (clean.slice(0, 3) !== '101' || clean.slice(45, 50) !== '01010' || clean.slice(92, 95) !== '101') {
+    return null;
+  }
+
+  const leftDigits: number[] = [];
+  for (let i = 0; i < 6; i++) {
+    const chunk = clean.slice(3 + i * 7, 3 + (i + 1) * 7);
+    if (GS1_L_CODES[chunk] !== undefined) {
+      leftDigits.push(GS1_L_CODES[chunk]);
+    } else {
+      return null;
+    }
+  }
+
+  const rightDigits: number[] = [];
+  for (let i = 0; i < 6; i++) {
+    const chunk = clean.slice(50 + i * 7, 50 + (i + 1) * 7);
+    if (GS1_R_CODES[chunk] !== undefined) {
+      rightDigits.push(GS1_R_CODES[chunk]);
+    } else {
+      return null;
+    }
+  }
+
+  return [...leftDigits, ...rightDigits].join('');
+}
+
+/**
+ * General barcode decoder from binary bars.
+ */
+export function decodeBarcodeBinary(binaryBars: string, format?: BarcodeFormat): string | null {
+  const clean = binaryBars.replace(/\s+/g, '');
+  if (format === 'EAN13' || (!format && clean.length === 95)) {
+    const decoded = decodeEan13Binary(clean);
+    if (decoded) return decoded;
+  }
+  if (format === 'EAN8' || (!format && clean.length === 67)) {
+    const decoded = decodeEan8Binary(clean);
+    if (decoded) return decoded;
+  }
+  if (format === 'UPC' || (!format && clean.length === 95)) {
+    const decoded = decodeUpcABinary(clean);
+    if (decoded) return decoded;
+  }
+  return null;
+}
+

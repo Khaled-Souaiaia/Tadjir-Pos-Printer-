@@ -14,6 +14,10 @@ import {
   Package,
   Tag,
   ShieldAlert,
+  FileDown,
+  Info,
+  Layers,
+  CheckCircle2,
 } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import {
@@ -22,6 +26,16 @@ import {
   generateValidEan13,
   fixBarcodeCheckDigit,
 } from '../../utils/barcodeUtils';
+import { generateBarcodeLabelPdf, createHighResLabelDataUrl } from '../../utils/barcodePdfExport';
+
+export interface SystemPrinterOption {
+  name: string;
+  displayName: string;
+  description: string;
+  status: number;
+  isDefault: boolean;
+  isVirtual: boolean;
+}
 
 interface BarcodePrintModalProps {
   product: Product;
@@ -42,11 +56,15 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
 
   const [currentProduct, setCurrentProduct] = useState<Product>(product);
   const [labelCount, setLabelCount] = useState<number>(1);
+  const [paperFormat, setPaperFormat] = useState<'roll_50x30' | 'a4_grid'>('roll_50x30');
   const [showPreview, setShowPreview] = useState<boolean>(true);
   const [validationResult, setValidationResult] = useState<BarcodeValidationResult>(() =>
     validateBarcode(product.barcode)
   );
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
+  const [printers, setPrinters] = useState<SystemPrinterOption[]>([]);
+  const [selectedPrinter, setSelectedPrinter] = useState<string>('');
   const [pendingCorrection, setPendingCorrection] = useState<{
     newBarcode: string;
     type: 'fix_check_digit' | 'generate_new';
@@ -97,6 +115,80 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
       return () => clearTimeout(timer);
     }
   }, [currentProduct.barcode, renderBarcode]);
+  // Detect printers if running in Electron environment
+  useEffect(() => {
+    const fetchPrinters = async () => {
+      const electronAPI = (window as any).electronAPI;
+      if (electronAPI?.getPrinters) {
+        try {
+          const list = await electronAPI.getPrinters();
+          if (Array.isArray(list) && list.length > 0) {
+            setPrinters(list);
+            const defaultPrinter = list.find((p: any) => p.isDefault)?.name || list[0]?.name || '';
+            setSelectedPrinter(defaultPrinter);
+          }
+        } catch (e) {
+          console.warn('[Printers Detection]:', e);
+        }
+      }
+    };
+    fetchPrinters();
+  }, []);
+
+  // Export labels directly to standard 50mm x 30mm PDF without needing a physical printer
+  const handleExportPdf = () => {
+    if (!validationResult.isValid) return;
+
+    setIsExportingPdf(true);
+    try {
+      const canvas = barcodeCanvasRef.current;
+      const canvasDataUrl = canvas ? canvas.toDataURL('image/png') : undefined;
+      // Generate 300-DPI offscreen label image containing Arabic Cairo typography + barcode + price
+      const fullLabelDataUrl = createHighResLabelDataUrl(
+        currentProduct,
+        currency,
+        canvas
+      );
+
+      const pdfResult = generateBarcodeLabelPdf(
+        {
+          barcode: currentProduct.barcode,
+          nameAr: currentProduct.nameAr,
+          nameFr: currentProduct.nameFr,
+          sellPrice: currentProduct.sellPrice,
+          categoryName,
+        },
+        {
+          labelCount,
+          currency,
+          paperFormat,
+          canvasDataUrl,
+          fullLabelDataUrl,
+        }
+      );
+
+      const safeName = (currentProduct.nameFr || currentProduct.nameAr || 'produit')
+        .replace(/[^a-zA-Z0-9_\u0600-\u06FF]/g, '_')
+        .slice(0, 30);
+      const filename = `etiquette-${currentProduct.barcode}-${safeName}.pdf`;
+      pdfResult.save(filename);
+
+      showToast(
+        lang === 'ar'
+          ? `تم تصدير ملف PDF بنجاح (${labelCount} ملصق - ${paperFormat === 'roll_50x30' ? '50×30 مم' : 'A4'})`
+          : `PDF exporté avec succès (${labelCount} étiquette(s) - ${paperFormat === 'roll_50x30' ? '50x30 mm' : 'A4'})`,
+        'success'
+      );
+    } catch (err: any) {
+      console.error('PDF Export Error:', err);
+      showToast(
+        lang === 'ar' ? 'فشل تصدير ملف PDF للملصقات' : 'Échec de l\'exportation PDF des étiquettes',
+        'error'
+      );
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   // Handle barcode repair confirmation
   const handleApplyBarcodeCorrection = () => {
@@ -265,14 +357,54 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
     `;
   };
 
-  // Handle print action
-  const handlePrint = () => {
+  // Handle print action (Physical or Virtual printer)
+  const handlePrint = async () => {
     if (!validationResult.isValid) {
       return;
     }
 
     setIsPrinting(true);
+    const electronAPI = (window as any).electronAPI;
 
+    // Electron environment: Direct printer invocation
+    if (electronAPI?.printBarcodeLabel) {
+      try {
+        const printHTML = generatePrintHTML();
+        const res = await electronAPI.printBarcodeLabel({
+          htmlContent: printHTML,
+          printerName: selectedPrinter || undefined,
+          silent: selectedPrinter ? true : false,
+        });
+
+        if (res && res.success) {
+          showToast(
+            lang === 'ar'
+              ? `تم إرسال أمر الطباعة بنجاح إلى: ${res.printerName}`
+              : `Impression envoyée à: ${res.printerName}`,
+            'success'
+          );
+        } else {
+          showToast(
+            lang === 'ar'
+              ? `تعذر إتمام الطباعة الفيزيائية: ${res?.error || 'الطابعة غير متاحة'}. يرجى استخدام "تصدير كـ PDF"`
+              : `Échec d'impression: ${res?.error || 'Imprimante indisponible'}. Veuillez exporter en PDF`,
+            'error'
+          );
+        }
+      } catch (err: any) {
+        showToast(
+          lang === 'ar'
+            ? `خطأ أثناء الاتصال بنظام الطباعة: ${err?.message || ''}`
+            : 'Erreur de communication avec le spouleur d\'impression',
+          'error'
+        );
+      } finally {
+        setIsPrinting(false);
+      }
+      return;
+    }
+
+    // Web Browser environment: Open browser print dialog
     try {
       const printHTML = generatePrintHTML();
       const iframe = printFrameRef.current;
@@ -567,52 +699,165 @@ export const BarcodePrintModal: React.FC<BarcodePrintModalProps> = ({
           <canvas ref={barcodeCanvasRef} style={{ display: 'none' }}></canvas>
         )}
 
-        {/* Label Count Input */}
+        {/* Format & Quantity Configuration */}
         {validationResult.isValid && (
-          <div className="mt-4">
-            <label className="block text-xs font-bold text-slate-700 mb-1 px-1">
-              {lang === 'ar' ? 'عدد الملصقات المطلوبة' : 'Nombre d\'étiquettes'}
-            </label>
-            <NeuInput
-              type="number"
-              min="1"
-              max="100"
-              value={labelCount}
-              onChange={(e) => {
-                const value = parseInt(e.target.value) || 1;
-                setLabelCount(Math.max(1, Math.min(100, value)));
-              }}
-              className="text-center font-bold text-lg"
-            />
-            <div className="text-[10px] text-slate-400 mt-1 px-1">
-              {lang === 'ar'
-                ? 'يمكنك تحديد من 1 إلى 100 ملصق للطباعة المباشرة'
-                : 'Vous pouvez imprimer de 1 à 100 étiquettes'}
+          <div className="mt-4 space-y-3">
+            {/* Format Selector: Roll 50x30mm vs A4 Sheet */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 px-1 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                  {lang === 'ar' ? 'نمط وهيئة الملصقات :' : 'Format de support :'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-normal">
+                  {paperFormat === 'roll_50x30'
+                    ? lang === 'ar' ? 'صفحة لكل ملصق (50×30 مم)' : '1 étiquette par page (50x30 mm)'
+                    : lang === 'ar' ? 'ورقة كاملة (32 ملصق)' : 'Feuille complète (32 étiquettes)'}
+                </span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaperFormat('roll_50x30')}
+                  className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all cursor-pointer ${
+                    paperFormat === 'roll_50x30'
+                      ? 'bg-blue-50 border-blue-400 text-blue-700 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="font-extrabold">{lang === 'ar' ? 'ملصق رول حراري' : 'Rouleau thermique'}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">50mm × 30mm (Thermal Roll)</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaperFormat('a4_grid')}
+                  className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all cursor-pointer ${
+                    paperFormat === 'a4_grid'
+                      ? 'bg-blue-50 border-blue-400 text-blue-700 shadow-sm'
+                      : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="font-extrabold">{lang === 'ar' ? 'شبكة ورق A4' : 'Grille planche A4'}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">32 {lang === 'ar' ? 'ملصق / ورقة' : 'étiquettes / page'}</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Label Count Input */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1 px-1">
+                {lang === 'ar' ? 'عدد الملصقات المطلوبة' : 'Nombre d\'étiquettes'}
+              </label>
+              <NeuInput
+                type="number"
+                min="1"
+                max="100"
+                value={labelCount}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 1;
+                  setLabelCount(Math.max(1, Math.min(100, value)));
+                }}
+                className="text-center font-bold text-lg"
+              />
+              <div className="text-[10px] text-slate-400 mt-1 px-1">
+                {lang === 'ar'
+                  ? 'يمكنك تحديد من 1 إلى 100 ملصق للطباعة أو التصدير كـ PDF'
+                  : 'Définissez de 1 à 100 étiquettes pour l\'impression ou l\'exportation PDF'}
+              </div>
+            </div>
+
+            {/* Printer Status / Target (Testing without physical printer) */}
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+              <div className="flex items-center justify-between font-bold text-slate-700 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                  <Printer className="w-3.5 h-3.5 text-slate-600" />
+                  {lang === 'ar' ? 'وجهة الطباعة / الطابعات المكتشفة :' : 'Cible d\'impression :'}
+                </span>
+                <span className="text-[10px] text-blue-600 font-semibold">
+                  {printers.length > 0
+                    ? `${printers.length} ${lang === 'ar' ? 'طابعة متاحة' : 'imprimante(s)'}`
+                    : lang === 'ar' ? 'تصدير PDF مستقل' : 'Mode Export PDF direct'}
+                </span>
+              </div>
+
+              {printers.length > 0 ? (
+                <div>
+                  <select
+                    value={selectedPrinter}
+                    onChange={(e) => setSelectedPrinter(e.target.value)}
+                    className="neu-input w-full rounded-xl py-1.5 px-2.5 text-xs font-bold text-slate-800 bg-white"
+                  >
+                    {printers.map((p) => (
+                      <option key={p.name} value={p.name}>
+                        {p.displayName || p.name} {p.isDefault ? '(الافتراضية / Défaut)' : ''} {p.isVirtual ? '(PDF / Virtual)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {lang === 'ar'
+                      ? 'يمكنك اختيار Microsoft Print to PDF أو أي طابعة فيزيائية/افتراضية.'
+                      : 'Sélectionnez Microsoft Print to PDF ou votre imprimante étiquette.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 text-slate-600 text-[11px] leading-relaxed">
+                  <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                  <span>
+                    {lang === 'ar'
+                      ? 'لم يتم تحديد طابعة فيزيائية. يمكنك تصدير الملف كـ PDF قياسي (50×30 مم) فوراً وفحصه دون الحاجة لأي طابعة.'
+                      : 'Aucune imprimante physique requise. Exportez directement votre fichier PDF (50x30 mm) pour vérification.'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3 mt-5 pt-4 border-t border-slate-200">
+        {/* Action Buttons: PDF Export + Print + Close */}
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 mt-5 pt-4 border-t border-slate-200">
+          {/* Primary Action 1: Export PDF */}
           <NeuButton
             variant="primary"
             fullWidth
+            onClick={handleExportPdf}
+            disabled={!validationResult.isValid || isExportingPdf}
+            icon={isExportingPdf ? undefined : <FileDown className="w-4 h-4" />}
+            className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold"
+          >
+            {isExportingPdf
+              ? lang === 'ar'
+                ? 'جاري إنشاء ملف PDF...'
+                : 'Génération PDF...'
+              : lang === 'ar'
+              ? `تصدير PDF (${labelCount} ملصق)`
+              : `Exporter PDF (${labelCount})`}
+          </NeuButton>
+
+          {/* Primary Action 2: Print via Spooler / Browser */}
+          <NeuButton
+            variant="default"
+            fullWidth
             onClick={handlePrint}
             disabled={!validationResult.isValid || isPrinting}
-            icon={isPrinting ? undefined : <Printer className="w-4 h-4" />}
+            icon={isPrinting ? undefined : <Printer className="w-4 h-4 text-blue-600" />}
+            className="font-bold text-slate-700"
           >
             {isPrinting
               ? lang === 'ar'
-                ? 'جاري التحضير للطباعة...'
+                ? 'جاري التحضير...'
                 : 'Préparation...'
               : lang === 'ar'
-              ? 'طباعة الملصقات الآن'
-              : 'Imprimer maintenant'}
+              ? 'طباعة عبر النظام'
+              : 'Imprimer'}
           </NeuButton>
+
+          {/* Close Action */}
           <NeuButton
             variant="default"
             onClick={onClose}
-            disabled={isPrinting}
+            disabled={isPrinting || isExportingPdf}
+            className="w-full sm:w-auto"
           >
             {lang === 'ar' ? 'إغلاق' : 'Fermer'}
           </NeuButton>
