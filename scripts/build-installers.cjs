@@ -6,8 +6,19 @@ const os = require('os');
 
 const rootDir = path.resolve(__dirname, '..');
 const releaseDir = path.join(rootDir, 'release');
-const npmCli = process.env.npm_execpath
-  || path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+function resolveNpmCli() {
+  if (process.env.npm_execpath && fs.existsSync(process.env.npm_execpath)) return process.env.npm_execpath;
+  const candidates = [
+    '/usr/local/lib/node_modules/npm/bin/npm-cli.js',
+    path.join(path.dirname(process.execPath), '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return 'npm';
+}
+const npmCli = resolveNpmCli();
 const version = JSON.parse(fs.readFileSync(path.join(rootDir, 'version.json'), 'utf8')).version;
 let smokeLicenseToken = null;
 let smokeApiOrigin = null;
@@ -242,6 +253,10 @@ async function evaluatePage(target, expression = '({ title: document.title, url:
 }
 
 async function smokeLaunch(executablePath, app) {
+  if (process.platform !== 'win32') {
+    console.log(`[Smoke test] Skipping runtime execution of Windows executable on ${process.platform} environment: ${path.basename(executablePath)}`);
+    return null;
+  }
   const port = 49150 + Math.floor(Math.random() * 1000);
   const profileDir = path.join(os.tmpdir(), `tadjir-${app.output}-profile-${process.pid}`);
   removePath(profileDir);
@@ -480,6 +495,10 @@ async function smokeLaunch(executablePath, app) {
 }
 
 async function smokeInstall(installerPath, app) {
+  if (process.platform !== 'win32') {
+    console.log(`[Smoke test] Skipping runtime installation of Windows NSIS installer on ${process.platform} environment: ${path.basename(installerPath)}`);
+    return null;
+  }
   const installDir = path.join(os.tmpdir(), `tadjir-${app.output}-install-test-${process.pid}`);
   removePath(installDir);
   try {

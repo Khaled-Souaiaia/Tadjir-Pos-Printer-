@@ -14,8 +14,6 @@ import {
   Trash2,
   Sparkles,
   Award,
-  ExternalLink,
-  Terminal,
 } from 'lucide-react';
 import { NeuButton } from '../common/NeuButton';
 import { NeuCard } from '../common/NeuCard';
@@ -220,55 +218,41 @@ export const LicenseCard: React.FC<LicenseCardProps> = ({
         </div>
       )}
 
-      {/* خيار إلغاء التفعيل ورابط وحدة المطور في الأسفل */}
-      <div className="mt-4 pt-3 border-t border-slate-200/70 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <a
-          href="/license-manager/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-blue-400 hover:text-blue-300 text-xs font-bold transition-colors w-fit border border-slate-800"
-          title="فتح وحدة المطور وإدارة التراخيص المركزية"
-        >
-          <Terminal className="w-3.5 h-3.5 text-blue-400" />
-          <span>{lang === 'ar' ? 'فتح وحدة المطور (License Manager)' : 'Ouvrir License Manager'}</span>
-          <ExternalLink className="w-3 h-3 text-slate-400" />
-        </a>
-
-        {isActivated && (
-          <div>
-            {showDeactivateConfirm ? (
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-rose-700 font-semibold">
-                  {lang === 'ar' ? 'هل أنت متأكد من إلغاء التفعيل؟' : 'Confirmer la désactivation ?'}
-                </span>
-                <button
-                  type="button"
-                  onClick={confirmDeactivate}
-                  className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold hover:bg-rose-700 transition-colors"
-                >
-                  {lang === 'ar' ? 'نعم، إلغاء التفعيل' : 'Oui, désactiver'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowDeactivateConfirm(false)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700 font-bold hover:bg-slate-300 transition-colors"
-                >
-                  {lang === 'ar' ? 'تراجع' : 'Annuler'}
-                </button>
-              </div>
-            ) : (
+      {/* خيار إلغاء تفعيل هذا الجهاز عند التنشيط */}
+      {isActivated && (
+        <div className="mt-4 pt-3 border-t border-slate-200/70 flex justify-end">
+          {showDeactivateConfirm ? (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-rose-700 font-semibold">
+                {lang === 'ar' ? 'هل أنت متأكد من إلغاء التفعيل؟' : 'Confirmer la désactivation ?'}
+              </span>
               <button
                 type="button"
-                onClick={() => setShowDeactivateConfirm(true)}
-                className="text-xs text-rose-500 hover:text-rose-700 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                onClick={confirmDeactivate}
+                className="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold hover:bg-rose-700 transition-colors"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>{lang === 'ar' ? 'إلغاء تفعيل هذا الجهاز' : 'Désactiver cette machine'}</span>
+                {lang === 'ar' ? 'نعم، إلغاء التفعيل' : 'Oui, désactiver'}
               </button>
-            )}
-          </div>
-        )}
-      </div>
+              <button
+                type="button"
+                onClick={() => setShowDeactivateConfirm(false)}
+                className="px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700 font-bold hover:bg-slate-300 transition-colors"
+              >
+                {lang === 'ar' ? 'تراجع' : 'Annuler'}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowDeactivateConfirm(true)}
+              className="text-xs text-rose-500 hover:text-rose-700 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{lang === 'ar' ? 'إلغاء تفعيل هذا الجهاز' : 'Désactiver cette machine'}</span>
+            </button>
+          )}
+        </div>
+      )}
     </NeuCard>
   );
 };

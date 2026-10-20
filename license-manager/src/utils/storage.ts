@@ -32,7 +32,7 @@ export const syncLicenseToCentralServer = async (record: ManagedLicenseRecord): 
   try {
     const res = await licenseApiFetch('/api/licenses', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': 'tadjir-admin-license-key-2026' },
       body: JSON.stringify(record),
     });
     return res.ok;
@@ -47,7 +47,9 @@ export const syncLicenseToCentralServer = async (record: ManagedLicenseRecord): 
  */
 export const fetchCentralLicenses = async (): Promise<ManagedLicenseRecord[] | null> => {
   try {
-    const res = await licenseApiFetch('/api/licenses');
+    const res = await licenseApiFetch('/api/licenses', {
+      headers: { 'x-admin-key': 'tadjir-admin-license-key-2026' },
+    });
     if (res.ok) {
       const data = await res.json();
       if (data?.licenses && Array.isArray(data.licenses)) {
@@ -72,7 +74,7 @@ export const updateCentralLicenseStatus = async (
   try {
     const res = await licenseApiFetch('/api/licenses/status', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': 'tadjir-admin-license-key-2026' },
       body: JSON.stringify({ licenseId, status, reason }),
     });
     return res.ok;
@@ -93,7 +95,7 @@ export const extendLicenseExpiration = async (
   try {
     const res = await licenseApiFetch('/api/licenses/extend', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': 'tadjir-admin-license-key-2026' },
       body: JSON.stringify({ licenseId, additionalHours, newExpiresAt }),
     });
     const data = await res.json();
@@ -113,7 +115,7 @@ export const resetDeviceBinding = async (
   try {
     const res = await licenseApiFetch('/api/licenses/reset-device', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': 'tadjir-admin-license-key-2026' },
       body: JSON.stringify({ licenseId }),
     });
     const data = await res.json();

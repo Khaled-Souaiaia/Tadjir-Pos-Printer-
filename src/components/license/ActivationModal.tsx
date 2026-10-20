@@ -10,8 +10,6 @@ import {
   RefreshCw,
   UploadCloud,
   Info,
-  ExternalLink,
-  Terminal,
 } from 'lucide-react';
 import { NeuButton } from '../common/NeuButton';
 import { NeuInput } from '../common/NeuInput';
@@ -53,13 +51,6 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
     navigator.clipboard.writeText(deviceId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
-  };
-
-  const handleQuickDemoActivate = () => {
-    const demoKey = 'TADJIR-DEMO-2026-TEST-PASS';
-    setSerialKeyInput(demoKey);
-    setCustomerNameInput(lang === 'ar' ? 'نسخة تجريبية / تقييم النظام' : 'Version Démo / Évaluation');
-    handleActivate(undefined, demoKey);
   };
 
   const handleActivate = async (e?: React.FormEvent, customToken?: string) => {
@@ -157,18 +148,18 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
               }`}
             >
               {licenseResult?.status === 'revoked'
-                ? 'License has been revoked. • الترخيص ملغى'
+                ? 'License Revoked • الترخيص ملغى من الإدارة'
                 : licenseResult?.status === 'suspended'
-                ? 'License has been suspended. • الترخيص معلق مؤقتًا'
+                ? 'License Suspended • الترخيص معلق مؤقتًا'
                 : licenseResult?.status === 'expired'
-                ? 'License expired. • انتهت صلاحية الترخيص'
+                ? 'License Expired • انتهت صلاحية الترخيص'
                 : licenseResult?.status === 'device_mismatch'
-                ? 'License is not valid for this device. • المعرّف غير مطابق'
+                ? 'Device Mismatch • المعرّف غير مطابق'
                 : licenseResult?.status === 'clock_rollback_detected'
-                ? 'Clock rollback detected. • تم رصد تلاعب بالساعة'
+                ? 'Clock Rollback • تم رصد تلاعب بالساعة'
                 : licenseResult?.status === 'product_mismatch'
-                ? 'Product mismatch. • الترخيص لمنتج آخر'
-                : 'License has not been activated. • البرنامج غير مفعل'}
+                ? 'Product Mismatch • الترخيص لمنتج آخر'
+                : 'License Required • البرنامج غير مفعل'}
             </span>
           </div>
         </div>
@@ -185,40 +176,6 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
                 ? 'يرجى إدخال مفتاح الترخيص المسلّم لك من قِبل مسؤول النظام لتفعيل البرنامج على هذا الجهاز. للحصول على المفتاح، قم بتزويد المسؤول بمعرّف هذا الجهاز (Device ID) الموضح أدناه.'
                 : "Veuillez saisir la clé de licence fournie par votre administrateur pour activer TADJIR sur ce poste. Pour obtenir votre clé, transmettez l'identifiant ci-dessous (Device ID) à l'administrateur."}
             </span>
-          </div>
-        </div>
-
-        {/* شريط الإجراءات السريعة للمطور والتقييم */}
-        <div className="mt-3.5 p-3 rounded-2xl bg-slate-900 border border-slate-800 text-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-bold text-slate-200">
-              {lang === 'ar' ? 'التقييم ووحدة المطور :' : 'Démo & Suite Développeur :'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleQuickDemoActivate}
-              disabled={isVerifying}
-              className="flex-1 sm:flex-none px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/30 transition-all cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>{lang === 'ar' ? 'تفعيل فوري سريع (Demo)' : 'Activation Rapide (Démo)'}</span>
-            </button>
-
-            <a
-              href="/license-manager/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 text-xs font-bold flex items-center justify-center gap-1.5 border border-slate-700 transition-colors"
-              title={lang === 'ar' ? 'فتح وحدة إدارة التراخيص للمطور' : 'Ouvrir License Manager'}
-            >
-              <Terminal className="w-3.5 h-3.5" />
-              <span>License Manager</span>
-              <ExternalLink className="w-3 h-3 text-slate-400" />
-            </a>
           </div>
         </div>
 
@@ -348,12 +305,12 @@ export const ActivationModal: React.FC<ActivationModalProps> = ({
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-rose-600" />
               <div>
                 <div className="font-extrabold text-sm mb-0.5">
-                  Your license has been deactivated. Please contact the administrator.
+                  License Revoked • الترخيص ملغى من الإدارة
                 </div>
                 <div className="font-semibold text-rose-700">
                   {lang === 'ar'
                     ? 'تم إلغاء تفعيل هذا الترخيص بواسطة الإدارة. يرجى مراجعة مسؤول النظام.'
-                    : "Cette licence a été désactivée par l'administration. Veuillez contacter votre administrateur."}
+                    : "Cette licence a été révoquée par l'administration. Veuillez contacter votre administrateur."}
                   {licenseResult.revocationReason && (
                     <span className="block mt-1 font-normal text-rose-600">
                       {licenseResult.revocationReason}

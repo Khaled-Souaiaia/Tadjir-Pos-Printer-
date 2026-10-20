@@ -10,8 +10,6 @@ import {
   Settings,
   Lock,
   Info,
-  ShieldCheck,
-  ExternalLink,
 } from 'lucide-react';
 
 export type TabType =
@@ -129,25 +127,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           );
         })}
       </nav>
-
-      {/* بوابة المطور وإدارة التراخيص */}
-      <div className="pt-2 mt-1 border-t border-slate-300/60">
-        <a
-          href="/license-manager/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 hover:text-blue-600 neu-raised transition-all group"
-          title="بوابة المطور - وحدة توليد وإدارة التراخيص"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
-              <ShieldCheck className="w-3.5 h-3.5" />
-            </div>
-            <span>إدارة التراخيص</span>
-          </div>
-          <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500" />
-        </a>
-      </div>
     </aside>
   );
 };
